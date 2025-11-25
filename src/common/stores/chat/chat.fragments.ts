@@ -33,7 +33,7 @@ export type DMessageContentFragment = _DMessageFragmentWrapper<'content',
   | DMessageTextPart              // plain text or mixed content -> BlockRenderer
   | DMessageReferencePart         // reference (e.g. zync entity) Content, such as a Asset (image, audio, PFD, etc.), chat, persona, etc.
   | DMessageImageRefPart          // large image
-  | DMessageToolInvocationPart    // shown to dev only, singature of the llm function call
+  | DMessageToolInvocationPart    // shown to dev only, signature of the llm function call
   | DMessageToolResponsePart      // shown to dev only, response of the llm
   | DMessageErrorPart             // red message, e.g. non-content application issues
   | _SentinelPart
@@ -65,6 +65,11 @@ export type DMessageVoidFragment = _DMessageFragmentWrapper<'void',
   | DVoidPlaceholderPart          // (non submitted) placeholder to be replaced by another part
   | _SentinelPart
 >;
+
+export type DVoidFragmentModelAnnotations = _NarrowFragmentToPart<DMessageVoidFragment, DVoidModelAnnotationsPart>;
+type _DVoidFragmentModelAux = _NarrowFragmentToPart<DMessageVoidFragment, DVoidModelAuxPart>;
+type _DVoidFragmentPlaceholder = _NarrowFragmentToPart<DMessageVoidFragment, DVoidPlaceholderPart>;
+type _NarrowFragmentToPart<TFragment extends DMessageFragment, TPart> = TFragment & { part: TPart };
 
 
 // Future Examples: up to 1 per message, containing the Rays and Merges that would be used to restore the Beam state - could be volatile (omitted at save)
@@ -108,7 +113,18 @@ export type DMessageFragmentVendorState = Record<string, unknown> & {
 
 export type DMessageTextPart = { pt: 'text', text: string };
 
-export type DMessageErrorPart = { pt: 'error', error: string };
+export type DMessageErrorPart = { pt: 'error', error: string, hint?: DMessageErrorPartHint };
+
+type DMessageErrorPartHint =
+  // AIX streaming errors (from aixClassifyStreamingError)
+  | 'aix-client-aborted'
+  | 'aix-net-disconnected'
+  | 'aix-request-exceeded'
+  | 'aix-response-captive'
+  | 'aix-net-unknown'
+  | 'aix-processing-error'
+  // Allow custom hints
+  | string;
 
 /**
  * @deprecated replaced by DMessageZyncAssetReferencePart to an image asset; here for migration purposes
@@ -303,11 +319,15 @@ export function isVoidFragment(fragment: DMessageFragment): fragment is DMessage
   return fragment.ft === 'void' && !!fragment.part?.pt;
 }
 
-export function isVoidAnnotationsFragment(fragment: DMessageFragment): fragment is DMessageVoidFragment & { part: DVoidModelAnnotationsPart } {
+export function isVoidAnnotationsFragment(fragment: DMessageFragment): fragment is DVoidFragmentModelAnnotations {
   return fragment.ft === 'void' && fragment.part.pt === 'annotations';
 }
 
-export function isVoidThinkingFragment(fragment: DMessageFragment): fragment is DMessageVoidFragment & { part: DVoidModelAuxPart } {
+export function isVoidPlaceholderFragment(fragment: DMessageFragment): fragment is _DVoidFragmentPlaceholder {
+  return fragment.ft === 'void' && fragment.part.pt === 'ph';
+}
+
+export function isVoidThinkingFragment(fragment: DMessageFragment): fragment is _DVoidFragmentModelAux {
   return fragment.ft === 'void' && fragment.part.pt === 'ma' && fragment.part.aType === 'reasoning';
 }
 
@@ -371,8 +391,8 @@ export function createTextContentFragment(text: string): DMessageContentFragment
   return _createContentFragment(_create_Text_Part(text));
 }
 
-export function createErrorContentFragment(error: string): DMessageContentFragment {
-  return _createContentFragment(_create_Error_Part(error));
+export function createErrorContentFragment(error: string, hint?: DMessageErrorPartHint): DMessageContentFragment {
+  return _createContentFragment(_create_Error_Part(error, hint));
 }
 
 export function createZyncAssetReferenceContentFragment(assetUuid: ZYNC_Entity.UUID, refSummary: string | undefined, assetType: 'image' | 'audio', legacyImageRefPart?: DMessageZyncAssetReferencePart['_legacyImageRefPart']): DMessageContentFragment {
@@ -505,8 +525,8 @@ function _create_Text_Part(text: string): DMessageTextPart {
   return { pt: 'text', text };
 }
 
-function _create_Error_Part(error: string): DMessageErrorPart {
-  return { pt: 'error', error };
+function _create_Error_Part(error: string, hint?: DMessageErrorPartHint): DMessageErrorPart {
+  return { pt: 'error', error, ...(hint && { hint }) };
 }
 
 export function createDMessageZyncAssetReferencePart(zUuid: ZYNC_Entity.UUID, refSummary: string | undefined, assetType: 'image' | 'audio', legacyImageRefPart?: DMessageZyncAssetReferencePart['_legacyImageRefPart']): DMessageZyncAssetReferencePart {
@@ -584,7 +604,7 @@ function _duplicate_Part<TPart extends (DMessageContentFragment | DMessageAttach
       return _create_Doc_Part(part.vdt, _duplicate_InlineData(part.data), part.ref, part.l1Title, newDocVersion, part.meta ? { ...part.meta } : undefined) as TPart;
 
     case 'error':
-      return _create_Error_Part(part.error) as TPart;
+      return _create_Error_Part(part.error, part.hint) as TPart;
 
     case 'reference':
       const rt = part.rt;

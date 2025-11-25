@@ -84,6 +84,14 @@ export const DModelParameterRegistry = {
     // No initialValue - undefined means off (e.g. default 200K context window)
   } as const,
 
+  llmVndAntEffort: {
+    label: 'Effort',
+    type: 'enum' as const,
+    description: 'Controls token usage vs. thoroughness trade-off. Works alongside thinking budget.',
+    values: ['low', 'medium', 'high'] as const,
+    // No initialValue - undefined means high effort (default, equivalent to omitting the parameter)
+  } as const,
+
   llmVndAntSkills: {
     label: 'Document Skills',
     type: 'string' as const,
@@ -96,7 +104,7 @@ export const DModelParameterRegistry = {
     type: 'integer' as const,
     description: 'Budget for extended thinking',
     range: [1024, 65536] as const,
-    initialValue: 8192,
+    initialValue: 16384,
     nullable: {
       meaning: 'Disable extended thinking',
     } as const,
@@ -117,6 +125,14 @@ export const DModelParameterRegistry = {
     values: ['auto', 'off'] as const,
     // No initialValue - undefined means off (same as 'off')
   } as const,
+
+  // llmVndAntToolSearch: { // Not user set
+  //   label: 'Tool Search',
+  //   type: 'enum' as const,
+  //   description: 'Search algorithm for discovering tools on-demand (regex=pattern-based, bm25=natural language)',
+  //   values: ['regex', 'bm25'] as const,
+  //   // No initialValue - undefined means off (tool search disabled)
+  // } as const,
 
   llmVndGeminiAspectRatio: {
     label: 'Aspect Ratio',
@@ -150,6 +166,14 @@ export const DModelParameterRegistry = {
     description: 'Enable Google Search grounding with optional time filter',
     values: ['unfiltered', '1d', '1w', '1m', '6m', '1y'] as const,
     // No initialValue - undefined means off
+  } as const,
+
+  llmVndGeminiImageSize: { // [Gemini, 2025-11-20] Nano Banana launch
+    label: 'Image Size',
+    type: 'enum' as const,
+    description: 'Controls the resolution of generated images',
+    values: ['1K', '2K', '4K'] as const,
+    // No initial value - when undefined, the model decides the image size
   } as const,
 
   llmVndGeminiMediaResolution: {

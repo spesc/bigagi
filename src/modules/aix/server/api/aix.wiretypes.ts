@@ -3,10 +3,10 @@ import * as z from 'zod/v4';
 // Used to align Particles to the Typescript definitions from the frontend-side, on 'chat.fragments.ts'
 import type { DMessageToolResponsePart } from '~/common/stores/chat/chat.fragments';
 
-import { anthropicAccessSchema } from '~/modules/llms/server/anthropic/anthropic.router';
-import { geminiAccessSchema } from '~/modules/llms/server/gemini/gemini.router';
-import { ollamaAccessSchema } from '~/modules/llms/server/ollama/ollama.router';
-import { openAIAccessSchema } from '~/modules/llms/server/openai/openai.router';
+import { anthropicAccessSchema } from '~/modules/llms/server/anthropic/anthropic.access';
+import { geminiAccessSchema } from '~/modules/llms/server/gemini/gemini.access';
+import { ollamaAccessSchema } from '~/modules/llms/server/ollama/ollama.access';
+import { openAIAccessSchema } from '~/modules/llms/server/openai/openai.access';
 
 
 //
@@ -336,6 +336,14 @@ export namespace AixWire_Tooling {
       properties: z.record(z.string(), OpenAPI_Schema.Object_schema),
       required: z.array(z.string()).optional(),
     }).optional(),
+
+    /**
+     * WARNING: Anthropic-ONLY for now - support for "Programmatic Tool Calling" - 2 new fields:
+     * - allowed_callers: which contexts can invoke this tool, where 'direct' is the model itself, and 'code_execution' is when invoked from a container, and even both
+     * - input_examples: array of example input objects that demonstrate format conventions, nested object population, etc.
+     */
+    allowed_callers: z.array(z.enum(['direct', 'code_execution'])).optional(),
+    input_examples: z.array(z.record(z.string(), z.any())).optional(),
   });
 
   const _FunctionCallTool_schema = z.object({
@@ -422,10 +430,31 @@ export namespace AixWire_API {
     maxTokens: z.number().min(1).optional(),
     topP: z.number().min(0).max(1).optional(),
     forceNoStream: z.boolean().optional(),
+
+    // Cross-vendor Structured Outputs
+
+    /**
+     * Constrain model response to a JSON schema for data extraction. Response will be valid JSON. Schema limitations vary by vendor.
+     * Supported: Anthropic (output_format), OpenAI (response_format), Gemini (responseSchema)
+     */
+    strictJsonOutput: z.object({
+      name: z.string().optional(),        // Required by OpenAI, optional elsewhere
+      description: z.string().optional(), // Helps model understand the schema's purpose
+      schema: z.any(),                    // JSON Schema object
+    }).optional(),
+
+    /**
+     * Enable strict schema validation for tool/function call invocations. Guarantees tool inputs exactly match the input_schema. Eliminates validation/retry logic.
+     * Supported: Anthropic (strict:true), OpenAI (strict:true). Gemini: not supported yet.
+     */
+    strictToolInvocations: z.boolean().optional(),
+
     // Anthropic
     vndAnt1MContext: z.boolean().optional(),
+    vndAntEffort: z.enum(['low', 'medium', 'high']).optional(),
     vndAntSkills: z.string().optional(),
     vndAntThinkingBudget: z.number().nullable().optional(),
+    vndAntToolSearch: z.enum(['regex', 'bm25']).optional(), // Tool Search Tool variant
     vndAntWebFetch: z.enum(['auto']).optional(),
     vndAntWebSearch: z.enum(['auto']).optional(),
     // Gemini
@@ -433,6 +462,7 @@ export namespace AixWire_API {
     vndGeminiCodeExecution: z.enum(['auto']).optional(),
     vndGeminiComputerUse: z.enum(['browser']).optional(),
     vndGeminiGoogleSearch: z.enum(['unfiltered', '1d', '1w', '1m', '6m', '1y']).optional(),
+    vndGeminiImageSize: z.enum(['1K', '2K', '4K']).optional(),
     vndGeminiMediaResolution: z.enum(['mr_high', 'mr_medium', 'mr_low']).optional(),
     vndGeminiShowThoughts: z.boolean().optional(),
     vndGeminiThinkingBudget: z.number().optional(), // old param
@@ -670,7 +700,7 @@ export namespace AixWire_Particles {
 
   export type PartParticleOp =
     | { p: '❤' } // heart beat
-    | { p: 'tr_', _t: string, weak?: 'tag' } // reasoning text, incremental; could be a 'weak' detection, e.g. heuristic from '<think>' rather than API-provided
+    | { p: 'tr_', _t: string, weak?: 'tag', restart?: boolean } // reasoning text, incremental; could be a 'weak' detection, e.g. heuristic from '<think>' rather than API-provided
     | { p: 'trs', signature: string } // reasoning signature
     | { p: 'trr_', _data: string } // reasoning raw (or redacted) data
     // | { p: 'ii', mimeType: string, i_b64?: string /* never undefined */ }

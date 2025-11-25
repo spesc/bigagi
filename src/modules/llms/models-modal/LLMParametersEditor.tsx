@@ -68,6 +68,13 @@ const _geminiAspectRatioOptions = [
   { value: '21:9', label: '21:9', description: 'Ultra wide' },
 ] as const;
 
+const _geminiImageSizeOptions = [
+  { value: _UNSPECIFIED, label: 'Default', description: '1K (default)' },
+  { value: '1K', label: '1K', description: 'Default' },
+  { value: '2K', label: '2K', description: '2K' },
+  { value: '4K', label: '4K', description: '4K' },
+] as const;
+
 const _geminiCodeExecutionOptions = [
   { value: 'auto', label: 'On', description: 'Enable code generation and execution' },
   { value: _UNSPECIFIED, label: 'Off', description: 'Disabled (default)' },
@@ -111,6 +118,12 @@ const _antWebSearchOptions = [
 const _antWebFetchOptions = [
   { value: 'auto', label: 'On', description: 'Enable fetching web content and PDFs' },
   { value: _UNSPECIFIED, label: 'Off', description: 'Disabled (default)' },
+] as const;
+
+const _antEffortOptions = [
+  { value: _UNSPECIFIED, label: 'High', description: 'Maximum capability (default)' },
+  { value: 'medium', label: 'Medium', description: 'Balanced speed and quality' },
+  { value: 'low', label: 'Low', description: 'Fastest, most efficient' },
 ] as const;
 
 // const _moonshotWebSearchOptions = [
@@ -180,6 +193,7 @@ export function LLMParametersEditor(props: {
     llmTemperature = FALLBACK_LLM_PARAM_TEMPERATURE, // fallback for undefined, result is number | null
     llmForceNoStream,
     llmVndAnt1MContext,
+    llmVndAntEffort,
     llmVndAntSkills,
     llmVndAntThinkingBudget,
     llmVndAntWebFetch,
@@ -187,6 +201,7 @@ export function LLMParametersEditor(props: {
     llmVndGeminiAspectRatio,
     llmVndGeminiCodeExecution,
     llmVndGeminiGoogleSearch,
+    llmVndGeminiImageSize,
     llmVndGeminiMediaResolution,
     llmVndGeminiShowThoughts,
     llmVndGeminiThinkingBudget,
@@ -309,6 +324,19 @@ export function LLMParametersEditor(props: {
       />
     )}
 
+    {showParam('llmVndAntEffort') && (
+      <FormSelectControl
+        title='Effort'
+        tooltip='Controls token usage vs. thoroughness. Low = fastest, most efficient. High = maximum capability (default). Works alongside thinking budget.'
+        value={llmVndAntEffort ?? _UNSPECIFIED}
+        onChange={(value) => {
+          if (value === _UNSPECIFIED || !value || value === 'high') onRemoveParameter('llmVndAntEffort');
+          else onChangeParameter({ llmVndAntEffort: value });
+        }}
+        options={_antEffortOptions}
+      />
+    )}
+
     {showParam('llmVndAntWebSearch') && (
       <FormSelectControl
         title='Web Search'
@@ -352,6 +380,19 @@ export function LLMParametersEditor(props: {
       <AnthropicSkillsConfig llmVndAntSkills={llmVndAntSkills} onChangeParameter={onChangeParameter} onRemoveParameter={onRemoveParameter} />
     )}
 
+
+    {showParam('llmVndGeminiImageSize') && (
+      <FormSelectControl
+        title='Image Size'
+        tooltip='Controls the resolution of generated images'
+        value={llmVndGeminiImageSize ?? _UNSPECIFIED}
+        onChange={(value) => {
+          if (value === _UNSPECIFIED || !value) onRemoveParameter('llmVndGeminiImageSize');
+          else onChangeParameter({ llmVndGeminiImageSize: value });
+        }}
+        options={_geminiImageSizeOptions}
+      />
+    )}
 
     {showParam('llmVndGeminiAspectRatio') && (
       <FormSelectControl
